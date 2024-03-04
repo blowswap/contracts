@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.6.12;
+pragma solidity = 0.6.12;
 
 library SafeMath {
     function add(uint256 a, uint256 b) internal pure returns (uint256) {
@@ -216,7 +216,7 @@ contract BEP20 is Context, IBEP20, Ownable {
 
     uint256 private _totalSupply;
     uint256 private MAXCAP;
-    uint256 constant MAXCAPSUPPLY = 100000000*1e18;
+    uint256 constant MAXCAPSUPPLY = 10000000*1e18;
 
     string private _name;
     string private _symbol;
@@ -224,11 +224,11 @@ contract BEP20 is Context, IBEP20, Ownable {
 
     mapping(address => bool) public farmPools;
 
-    constructor(string memory name1, string memory symbol1) public {
-        _name = name1;
-        _symbol = symbol1;
+    constructor(string memory name_, string memory symbol_) public {
+        _name = name_;
+        _symbol = symbol_;
         _decimals = 18;
-        _mint(_msgSender(), 1000000 * 1e18);
+        _mint(_msgSender(), 5000000 * 1e18);
     }
 
     function getOwner() external override view returns (address) {
@@ -357,7 +357,7 @@ contract BEP20 is Context, IBEP20, Ownable {
 
 contract BlowSwapToken is BEP20("BlowSwap.com", "BLST") {
     function mint(address _to, uint256 _amount) public {
-        require(isWhiteAddress(_msgSender()), 'only owner');
+        require(isWhiteAddress(_msgSender()), 'not the owner');
         _mint(_to, _amount);
     }
 }
