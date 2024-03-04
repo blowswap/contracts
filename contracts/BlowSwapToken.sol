@@ -355,7 +355,7 @@ contract BEP20 is Context, IBEP20, Ownable {
     }
 }
 
-contract BlowSwapToken is BEP20("BlowSwap.com", "BLST") {
+contract BlowSwapToken is BEP20("BlowSwap.com", "BLOW") {
     function mint(address _to, uint256 _amount) public {
         require(isWhiteAddress(_msgSender()), 'not the owner');
         _mint(_to, _amount);
