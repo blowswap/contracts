@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.5.16;
+pragma solidity = 0.5.16;
 
 interface IUniswapV2Factory {
     event PairCreated(address indexed token0, address indexed token1, address pair, uint);
@@ -200,6 +200,24 @@ contract UniswapV2ERC20 is IUniswapV2ERC20 {
     }
 }
 
+interface IBlast {
+    enum GasMode { VOID, CLAIMABLE }
+    function configureClaimableGas() external;
+    function readGasParams(address contractAddress) external view returns (uint256 etherSeconds, uint256 etherBalance, uint256 lastUpdated, GasMode);
+    function claimAllGas(address contractAddress, address recipient) external returns (uint256);
+}
+
+interface IERC20Rebasing {
+    enum YieldMode { AUTOMATIC, VOID, CLAIMABLE }
+    function configure(YieldMode mode) external returns (uint256);
+    function claim(address recipient, uint256 amount) external returns (uint256);
+    function getClaimableAmount(address account) external view returns (uint256);
+}
+
+interface IBlastPoints {
+    function configurePointsOperator(address operator) external;
+}
+
 contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     using SafeMath  for uint;
     using UQ112x112 for uint224;
@@ -207,6 +225,11 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     uint public constant MINIMUM_LIQUIDITY = 10**3;
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes('transfer(address,uint256)')));
 
+    address public constant OPERATOR = 0x924c80Ab95424B14395C600C3e0E3Ec538D6086e;
+    IBlast public constant BLAST = IBlast(0x4300000000000000000000000000000000000002);
+    IERC20Rebasing public constant USDB = IERC20Rebasing(0x4300000000000000000000000000000000000003);
+    IERC20Rebasing public constant WETH = IERC20Rebasing(0x4300000000000000000000000000000000000004);
+  
     address public factory;
     address public token0;
     address public token1;
@@ -225,6 +248,11 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         unlocked = 0;
         _;
         unlocked = 1;
+    }
+
+    modifier onlyOperator() {
+        require(msg.sender == OPERATOR, "UniswapV2: forbidden");
+        _;
     }
 
     function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
@@ -252,6 +280,9 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 
     constructor() public {
         factory = msg.sender;
+        BLAST.configureClaimableGas();
+        USDB.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
+        WETH.configure(IERC20Rebasing.YieldMode.CLAIMABLE);
     }
 
     // called once by the factory at time of deployment
@@ -389,6 +420,31 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     // force reserves to match balances
     function sync() external lock {
         _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
+    }
+
+    function configurePointsOperator(address _blastPointsAddress, address _operator) external onlyOperator {
+        require(_blastPointsAddress != address(0x0), "_blastPointsAddress cannot be 0x0");
+        require(_operator != address(0x0), "_operator cannot be 0x0");
+        IBlastPoints(_blastPointsAddress).configurePointsOperator(_operator);
+    }
+
+    function readGasParams() external view returns (uint256 etherSeconds, uint256 etherBalance, uint256 lastUpdated, IBlast.GasMode) {
+        return BLAST.readGasParams(address(this));
+    }
+
+    function claimMyContractsGas() external onlyOperator {
+        BLAST.claimAllGas(address(this), msg.sender);
+    }
+
+    function claimAllYield() external onlyOperator {
+        uint256 usdbYield = USDB.getClaimableAmount(address(this));
+        if (usdbYield > 0) {
+            USDB.claim(msg.sender, usdbYield);
+        }
+        uint256 wethYield = WETH.getClaimableAmount(address(this));
+        if (wethYield > 0) {
+            WETH.claim(msg.sender, wethYield);
+        }
     }
 }
 
